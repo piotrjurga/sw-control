@@ -1,0 +1,5 @@
+# ignore log files
+*.csv
+
+# ignore python bytecode
+__pycache__
