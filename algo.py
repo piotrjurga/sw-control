@@ -4,7 +4,6 @@ import pandas as pd
 
 from sys import stderr
 from os import path
-from dataclasses import field
 from datetime import datetime
 from simulation import Purifier
 
