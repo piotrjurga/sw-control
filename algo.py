@@ -238,7 +238,7 @@ async def start():
     global purifier
     purifier = environment()
     # XXX:   symulacja       sterowanie
-    tasks = [purifier.run(), cycle_loop()]
+    tasks = [purifier.run(delay=delay), cycle_loop()]
     await aio.gather(*tasks)
 
 
