@@ -1,12 +1,12 @@
 import requests
 from config import *
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 # FIXME:
-# (1) my wysylamy ze checemy zmienic
-# (2) hardware wysyla ze cos ma nowego
-# (3) my pytamy hardware o stan
-
-# FIXME: async? non blocking!!!!
+# (1) [done] my wysylamy ze checemy zmienic
+# (2) [    ] hardware wysyla ze cos ma nowego
+# (3) [done] my pytamy hardware o stan
 
 
 class API:
@@ -15,36 +15,43 @@ class API:
     #        aby moc redukowac 'latency'
     #        albo odkryc ze czujnik sie popsul/nie reaguje
 
-    buffer = {}
+    buffer = defaultdict(int)
+    thread = {}
+    executor = None
+
+    def __init__(self):
+        self.executor = ThreadPoolExecutor(max_workers=4)
+
+    def lazy_request(self, uri, data):
+        response = requests.get(uri, json=data)
+        return response.json()["result"]
 
     def send(self, key, val):
         global HARDWARE_URI
-        # FIXME: send via request
-        # print(f"API: send {key} {val}")
-        # FIXME: IS MEASURE?
-        if key in Measure.state:
-            raise Exception("przeciez to czujnik!")
+
         if val is None:
             return
+        if key in Measure.state:
+            raise Exception("przeciez to czujnik!")
 
-        response = requests.get(f"{HARDWARE_URI}/send",
-                                json={
-                                    "key": key,
-                                    "val": val
-                                })
-        # print("---------->", response.json())
+        url = f"{HARDWARE_URI}/send"
+        data = {"key": key, "val": val}
 
-        # self.storage[key] = val
+        self.thread["send" + key] = self.executor.submit(
+            self.lazy_request, url, data)
 
     def recv(self, key):
-        # FIXME: zlecaj tutaj taska na zaciagniecie tej danej
-
         global HARDWARE_URI
-        # print(f"API: recv {key}")
-        # FIXME: get from buffer (endpoint collector) / different script?
-        # process
-        # return self.storage[key]
 
-        response = requests.get(f"{HARDWARE_URI}/recv", json={"key": key})
-        # print("---------->", response.json())
-        return response.json()["result"]
+        url = f"{HARDWARE_URI}/recv"
+        data = {"key": key}
+
+        if "recv" + key not in self.thread:
+            self.thread["recv" + key] = self.executor.submit(
+                self.lazy_request, url, data)
+            return self.buffer[key]
+        if self.thread["recv" + key].running():
+            return self.buffer[key]
+
+        self.buffer[key] = self.thread["recv" + key].result()
+        return self.buffer[key]
