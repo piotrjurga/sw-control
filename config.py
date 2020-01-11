@@ -1,5 +1,10 @@
 # FIXME: w nadziei ze bedzie mozna modelowac rozne struktury
 
+# hardware information
+HARDWARE_HOST = "0.0.0.0"
+HARDWARE_PORT = 8044
+HARDWARE_URI = f"http://{HARDWARE_HOST}:{str(HARDWARE_PORT)}"
+
 # pump identifiers
 PUMPS = P1, P2, P3, P4 = ["P1", "P2", "P3", "P4"]
 # valve identifiers

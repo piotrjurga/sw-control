@@ -3,7 +3,10 @@
 
 print("--- HARDWARE ---")
 
+from sanic import Sanic
 from sanic.response import json
+
+from config import *
 
 app = Sanic()
 
@@ -26,15 +29,27 @@ STORAGE = {
 }
 
 
-@app.route("/push")
-async def push(request):
+@app.route("/send")
+async def send(request):
     global STORAGE
-    key = request.args["key"]
-    val = request.args["val"]
+    key = request.json["key"]
+    val = request.json["val"]
     if key in STORAGE:
         STORAGE[key] = val
-    return json({"hello": "world"})
+    return json({"result": "accepted"})
 
+
+@app.route("/recv")
+async def recv(request):
+    global STORAGE
+    key = request.json["key"]
+    val = None
+    if key in STORAGE:
+        val = STORAGE[key]
+    return json({"result": val})
+
+
+# FIXME: jak tu zrobic to flow?
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+    app.run(debug=True, host=HARDWARE_HOST, port=HARDWARE_PORT)

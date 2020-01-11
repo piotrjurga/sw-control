@@ -10,7 +10,8 @@ from config import *
 from model.blackbox import BlackBoxModel
 from model.simulation import SimulationModel
 
-environment = SimulationModel
+# environment = SimulationModel
+environment = BlackBoxModel
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
