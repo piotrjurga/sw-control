@@ -1,11 +1,7 @@
 import asyncio as aio
+from config import *
+from blackbox import BlackBox
 
-# pump identifiers
-PUMPS = P1, P2, P3, P4 = ['P1', 'P2', 'P3', 'P4']
-# valve identifiers
-VALVES = Y1, Y2, Y3 = ['Y1', 'Y2', 'Y3']
-# meter identifiers
-METERS = C1, C2, C3, C4, C5 = ['C1', 'C2', 'C3', 'C4', 'C5']
 # state keys
 KEYS = METERS + VALVES + PUMPS
 
@@ -20,38 +16,23 @@ TARGET = {P1: C1, P2: C2, P3: C3, P4: C4, Y1: C5, Y2: C5, Y3: C5}
 
 delay = 0.01
 
-class Purifier:
-    def __init__(self):
-        self.state = {
-                P1: 0, P2: 0, P3: 0, P4: 0,
-                Y1: 0, Y2: 0, Y3: 0,
-                C1: MAX[C1],
-                C2: MIN[C2], C3: MIN[C3], C4: MIN[C4], C5: MIN[C5]+1
-                }
-        active = False
 
-    def read_state(self, id):
-        assert(id in KEYS)
-        return self.state[id]
-
+class Simulation(BlackBox):
     def transfer(self, source, target, amount):
         amount = min(amount, self.state[source])
-        #amount = min(amount, MAX[target] + 0.1 - self.state[target])
+        # amount = min(amount, MAX[target] + 0.1 - self.state[target])
         self.state[source] -= amount
         self.state[target] += amount
 
-    def set_pump(self, id, val: bool):
-        self.state[id] = val
-
-    def set_valve(self, id, val: bool):
-        self.state[id] = val
+    def fake_flow(self):
+        for p in PUMPS + VALVES:
+            if self.state[p]:
+                self.transfer(SOURCE[p], TARGET[p], SPEED[p] * delay)
 
     async def run(self):
         self.active = True
 
         while self.active:
-            for p in PUMPS + VALVES:
-                if self.state[p]:
-                    self.transfer(SOURCE[p], TARGET[p], SPEED[p]*delay)
-
+            self.state.update()
+            self.fake_flow()  # XXX
             await aio.sleep(delay)
