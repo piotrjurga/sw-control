@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 # (2) [    ] hardware wysyla ze cos ma nowego
 # (3) [done] my pytamy hardware o stan
 
+# FIXME: ThreadPoolExecutor not working!!!
+
 
 class API:
     # FIXME: kazde pole powinno miec czas
@@ -34,24 +36,31 @@ class API:
         if key in Measure.state:
             raise Exception("przeciez to czujnik!")
 
-        url = f"{HARDWARE_URI}/send"
+        uri = f"{HARDWARE_URI}/send"
         data = {"key": key, "val": val}
-
+        """
         self.thread["send" + key] = self.executor.submit(
-            self.lazy_request, url, data)
+            self.lazy_request, uri, data)
+        """
+        response = requests.get(uri, json=data)
+        return response.json()["result"]
 
     def recv(self, key):
         global HARDWARE_URI
 
-        url = f"{HARDWARE_URI}/recv"
+        uri = f"{HARDWARE_URI}/recv"
         data = {"key": key}
-
+        """
         if "recv" + key not in self.thread:
             self.thread["recv" + key] = self.executor.submit(
-                self.lazy_request, url, data)
+                self.lazy_request, uri, data)
             return self.buffer[key]
         if self.thread["recv" + key].running():
             return self.buffer[key]
 
         self.buffer[key] = self.thread["recv" + key].result()
         return self.buffer[key]
+        """
+
+        response = requests.get(uri, json=data)
+        return response.json()["result"]

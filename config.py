@@ -13,11 +13,16 @@ VALVES = Y1, Y2, Y3 = ["Y1", "Y2", "Y3"]
 METERS = C1, C2, C3, C4, C5 = ["C1", "C2", "C3", "C4", "C5"]
 
 
-class Measure:
+class Device:
+    def __init__(self, manager):
+        self.state = manager.dict(self.state)
+
+
+class Measure(Device):
     state = {C1: None, C2: None, C3: None, C4: None, C5: None}
 
 
-class Control:
+class Control(Device):
     state = {
         P1: None,
         P2: None,

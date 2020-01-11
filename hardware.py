@@ -1,55 +1,60 @@
-# FIXME: server ktory dziala jak core/api_stub? i ma lagi czy cos???
-#        jakis napewno dziwny behavior?
+import time
+import asyncio as aio
+import multiprocessing
 
 print("--- HARDWARE ---")
 
 from sanic import Sanic
 from sanic.response import json
 
+# FIXME: uzywamy tej samej symulacji do testu
 from config import *
-
-app = Sanic()
-
-MAX = {C1: 100, C2: 10, C3: 10, C4: 10, C5: 100}
-MIN = {C1: 0, C2: 0, C3: 0, C4: 0, C5: 0}
-
-STORAGE = {
-    P1: 0,
-    P2: 0,
-    P3: 0,
-    P4: 0,
-    Y1: 0,
-    Y2: 0,
-    Y3: 0,
-    C1: MAX[C1],
-    C2: MIN[C2],
-    C3: MIN[C3],
-    C4: MIN[C4],
-    C5: MIN[C5] + 1,
-}
+from model.simulation import SimulationModel
 
 
-@app.route("/send")
+class SimulationModelSync(SimulationModel):
+    def run_sync(self, delay=0.01):
+        self.active = True
+
+        while self.active:
+            # XXX: print(self.state())
+            self.state.update()
+            self.fake_flow(delay)  # XXX
+            time.sleep(delay)
+
+
+environment = SimulationModelSync
+purifier = environment()
+
+service = Sanic(name="hardware")
+
+
+@service.route("/send")
 async def send(request):
-    global STORAGE
     key = request.json["key"]
     val = request.json["val"]
-    if key in STORAGE:
-        STORAGE[key] = val
+    service.purifier.state[key] = val
+    print(f"\033[92m (send) key={key} val={val} \
+| state={service.purifier.state[key]}\033[m")
     return json({"result": "accepted"})
 
 
-@app.route("/recv")
+@service.route("/recv")
 async def recv(request):
-    global STORAGE
     key = request.json["key"]
-    val = None
-    if key in STORAGE:
-        val = STORAGE[key]
+    val = service.purifier.state[key]
+    print(f"\033[92m (recv) key={key} val={val} \033[m")
     return json({"result": val})
 
 
-# FIXME: jak tu zrobic to flow?
-
 if __name__ == "__main__":
-    app.run(debug=True, host=HARDWARE_HOST, port=HARDWARE_PORT)
+
+    def run(obj):
+        obj.run_sync()
+
+    worker = multiprocessing.Process(target=run, args=[purifier])
+    worker.start()
+
+    service.purifier = purifier
+    service.run(debug=True, host=HARDWARE_HOST, port=HARDWARE_PORT)
+    worker.join()

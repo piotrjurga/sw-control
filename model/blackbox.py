@@ -1,4 +1,6 @@
 import asyncio as aio
+from multiprocessing import Manager
+
 from core.api import API
 from config import *
 
@@ -47,11 +49,12 @@ class ProxyDict:
 
 class BlackBoxModel:
     state = ProxyDict()
+    manager = Manager()
     active = False
 
-    def __init__(self):
-        self.state.add(Control())
-        self.state.add(Measure())
+    def __init__(self, modules=[Control, Measure]):
+        for module in modules:
+            self.state.add(module(self.manager))
 
     async def run(self, delay=0.01):
         self.active = True

@@ -29,9 +29,9 @@ class SimulationModel(BlackBoxModel):
     SOURCE = {P1: C5, P2: C1, P3: C1, P4: C1, Y1: C2, Y2: C3, Y3: C4}
     TARGET = {P1: C1, P2: C2, P3: C3, P4: C4, Y1: C5, Y2: C5, Y3: C5}
 
-    def __init__(self):
-        self.state.add(FakeControl())
-        self.state.add(FakeMeasure())
+    def __init__(self, modules=[FakeControl, FakeMeasure]):
+        for module in modules:
+            self.state.add(module(self.manager))
 
     def transfer(self, source, target, amount):
         amount = min(amount, self.state[source])
