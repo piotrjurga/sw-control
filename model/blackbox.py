@@ -1,5 +1,5 @@
 import asyncio as aio
-from api import API
+from core.api import API
 from config import *
 
 
@@ -35,7 +35,7 @@ class ProxyDict:
                 obj.state[key] = self.api.recv(key)
 
 
-class BlackBox:
+class BlackBoxModel:
     state = None
     active = False
 

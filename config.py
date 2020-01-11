@@ -1,3 +1,5 @@
+# FIXME: w nadziei ze bedzie mozna modelowac rozne struktury
+
 # pump identifiers
 PUMPS = P1, P2, P3, P4 = ["P1", "P2", "P3", "P4"]
 # valve identifiers

@@ -7,10 +7,10 @@ from os import path
 from datetime import datetime
 
 from config import *
-from blackbox import BlackBox
-from simulation import Simulation
+from model.blackbox import BlackBoxModel
+from model.simulation import SimulationModel
 
-environment = Simulation
+environment = SimulationModel
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS

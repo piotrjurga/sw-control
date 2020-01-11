@@ -1,9 +1,9 @@
 import asyncio as aio
 from config import *
-from blackbox import BlackBox
+from model.blackbox import BlackBoxModel
 
 
-class Simulation(BlackBox):
+class SimulationModel(BlackBoxModel):
     # speeds in level units transported per second (assume equal diameters)
     SPEED = {k: 0.5 for k in PUMPS + VALVES}
 
