@@ -6,6 +6,10 @@ from config import *
 class ProxyDict:
     api = API()
     storage = []
+    fake = False
+
+    def __init__(self, fake=False):
+        self.fake = fake
 
     def add(self, obj):
         self.storage.append(obj)
@@ -14,13 +18,15 @@ class ProxyDict:
         for obj in self.storage:
             if key in obj.state:
                 return obj.state[key]
+        print(f"\033[91 NONE????????? {key} \033[m")
         return None
 
     def __setitem__(self, key, val):
         for obj in self.storage:
             if key in obj.state:
-                # XXX: obj.state[key] = val
-                # bo chcemy aby `.update()` to potwierdzil
+                # (fake) bo chcemy aby `.update()` to potwierdzil
+                if self.fake:
+                    obj.state[key] = val
                 self.api.send(key, val)
 
     def __call__(self):
@@ -36,11 +42,10 @@ class ProxyDict:
 
 
 class BlackBoxModel:
-    state = None
+    state = ProxyDict()
     active = False
 
     def __init__(self):
-        self.state = ProxyDict()
         self.state.add(Control())
         self.state.add(Measure())
 

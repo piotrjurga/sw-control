@@ -25,6 +25,8 @@ class API:
         # FIXME: send via request
         # print(f"API: send {key} {val}")
         # FIXME: fake sleep
+        if val is None:
+            return
         self.storage[key] = val
 
     def recv(self, key):

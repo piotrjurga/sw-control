@@ -1,9 +1,11 @@
 import asyncio as aio
 from config import *
-from model.blackbox import BlackBoxModel
+from model.blackbox import ProxyDict, BlackBoxModel
 
 
 class SimulationModel(BlackBoxModel):
+    state = ProxyDict(fake=True)
+
     # speeds in level units transported per second (assume equal diameters)
     SPEED = {k: 0.5 for k in PUMPS + VALVES}
 
