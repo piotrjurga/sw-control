@@ -2,6 +2,8 @@ import asyncio as aio
 from core.api import API
 from config import *
 
+# FIXME: StatsContainer: gromadzenie danych i ich wizualizacja
+
 
 class ProxyDict:
     api = API()
@@ -18,7 +20,6 @@ class ProxyDict:
         for obj in self.storage:
             if key in obj.state:
                 return obj.state[key]
-        print(f"\033[91 NONE????????? {key} \033[m")
         return None
 
     def __setitem__(self, key, val):
@@ -27,7 +28,8 @@ class ProxyDict:
                 # (fake) bo chcemy aby `.update()` to potwierdzil
                 if self.fake:
                     obj.state[key] = val
-                self.api.send(key, val)
+                else:
+                    self.api.send(key, val)
 
     def __call__(self):
         result = {}
@@ -36,6 +38,8 @@ class ProxyDict:
         return result
 
     def update(self):
+        if self.fake:
+            return
         for obj in self.storage:
             for key in obj.state.keys():
                 obj.state[key] = self.api.recv(key)
