@@ -10,8 +10,8 @@ from config import *
 from model.blackbox import BlackBoxModel
 from model.simulation import SimulationModel
 
-environment = SimulationModel
-# environment = BlackBoxModel
+# environment = SimulationModel
+environment = BlackBoxModel
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
@@ -150,15 +150,17 @@ async def phase_2():
     # TODO(piotr): should we check for airlocks here? the meter level
     # may be constant naturally as the pumps are potentially on
     while True:
-        while get_elapsed() < T_ust1 and not (
-                get_level(C1) < C1_max and get_level(C5) > C5_min):
+        while get_elapsed() < T_ust1 and not (get_level(C1) < C1_max
+                                              and get_level(C5) > C5_min):
             await aio.sleep(delay)
-        if get_elapsed() >= T_ust1: break
+        if get_elapsed() >= T_ust1:
+            break
         await set_pump(P1, 1)
-        while get_elapsed() < T_ust1 and not (
-                get_level(C1) >= C1_max and get_level(C5) <= C5_min):
+        while get_elapsed() < T_ust1 and not (get_level(C1) >= C1_max
+                                              and get_level(C5) <= C5_min):
             await aio.sleep(delay)
-        if get_elapsed() >= T_ust1: break
+        if get_elapsed() >= T_ust1:
+            break
         await set_pump(P1, 0)
     await set_pump(P1, 0)
     log("exiting phase 2")
@@ -177,11 +179,13 @@ async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     while get_elapsed() < t_ust:
         while get_elapsed() < t_ust and not get_level(C_i) > c_rg:
             await aio.sleep(delay)
-        if get_elapsed() >= t_ust: break
+        if get_elapsed() >= t_ust:
+            break
         await set_pump(P_i, 0)
         while get_elapsed() < t_ust and not get_level(C_i) < c_rd:
             await aio.sleep(delay)
-        if get_elapsed() >= t_ust: break
+        if get_elapsed() >= t_ust:
+            break
         await set_pump(P_i, 1)
 
     await set_pump(P_i, 0)
