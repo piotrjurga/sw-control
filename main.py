@@ -10,8 +10,8 @@ from config import *
 from model.blackbox import BlackBoxModel
 from model.simulation import SimulationModel
 
-# environment = SimulationModel
-environment = BlackBoxModel
+environment = SimulationModel
+# environment = BlackBoxModel
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
@@ -19,7 +19,7 @@ KEYS = ["timestamp"] + METERS + VALVES + PUMPS
 # settings
 C1_max, C2_max, C3_max, C4_max, C5_max = 100, 10, 10, 10, 100
 C1_min, C2_min, C3_min, C4_min, C5_min = 0.1, 0.1, 0.1, 0.1, 0.1
-T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 2, 2, 2, 2, 2
+T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 8, 8, 8, 8, 2
 C2_rd, C3_rd, C4_rd = 1, 1, 1
 C2_rg, C3_rg, C4_rg = 8, 8, 8
 report_dir = "."
@@ -139,7 +139,7 @@ async def phase_1():
     if get_level(C1) >= C1_max:
         return
     await set_pump(P1, 1)
-    while get_level(C1) >= C1_max:
+    while not (get_level(C1) >= C1_max):
         await aio.sleep(delay)
     await set_pump(P1, 0)
     log("exiting phase 1")
@@ -149,13 +149,18 @@ async def phase_2():
     log("entered phase 2", color=92)
     # TODO(piotr): should we check for airlocks here? the meter level
     # may be constant naturally as the pumps are potentially on
-    while get_elapsed() < T_ust1:
-        while not (get_level(C1) < C1_max and get_level(C5) > C5_min):
+    while True:
+        while get_elapsed() < T_ust1 and not (
+                get_level(C1) < C1_max and get_level(C5) > C5_min):
             await aio.sleep(delay)
+        if get_elapsed() >= T_ust1: break
         await set_pump(P1, 1)
-        while not (get_level(C1) >= C1_max and get_level(C5) <= C5_min):
+        while get_elapsed() < T_ust1 and not (
+                get_level(C1) >= C1_max and get_level(C5) <= C5_min):
             await aio.sleep(delay)
+        if get_elapsed() >= T_ust1: break
         await set_pump(P1, 0)
+    await set_pump(P1, 0)
     log("exiting phase 2")
 
 
@@ -170,11 +175,13 @@ async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     # TODO(piotr): should we check for airlocks here? the meter level
     # may be constant naturally as the valve is open
     while get_elapsed() < t_ust:
-        while not get_level(C_i) > c_rg:
+        while get_elapsed() < t_ust and not get_level(C_i) > c_rg:
             await aio.sleep(delay)
+        if get_elapsed() >= t_ust: break
         await set_pump(P_i, 0)
-        while not get_level(C_i) < c_rd:
+        while get_elapsed() < t_ust and not get_level(C_i) < c_rd:
             await aio.sleep(delay)
+        if get_elapsed() >= t_ust: break
         await set_pump(P_i, 1)
 
     await set_pump(P_i, 0)
@@ -221,6 +228,7 @@ async def print_vals():
     log("print_vals", color=92)
     while cycle.active:
         print(f"state: {cycle.purifier.state()}")
+        print(f"time: {get_elapsed()}")
         await aio.sleep(1)
 
 
