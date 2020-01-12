@@ -1,3 +1,5 @@
+![](docs/screen.png)
+
 ```bash
 $ prometheus          # debug: metrics server
 $ python3 hardware.py # to symulate hardware I/O
