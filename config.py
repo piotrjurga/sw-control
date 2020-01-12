@@ -1,9 +1,15 @@
 # FIXME: w nadziei ze bedzie mozna modelowac rozne struktury
 
 # hardware information
+# FIXME: scrap maybe env.yml with: delay, workers_num
 HARDWARE_HOST = "0.0.0.0"
 HARDWARE_PORT = 8044
 HARDWARE_URI = f"http://{HARDWARE_HOST}:{str(HARDWARE_PORT)}"
+
+# our metrics for debugging states
+# FIXME: scrap here `prometheus.yml`
+METRICS_HOST = "0.0.0.0"
+METRICS_PORT = 8111
 
 # pump identifiers
 PUMPS = P1, P2, P3, P4 = ["P1", "P2", "P3", "P4"]

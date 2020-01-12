@@ -13,7 +13,7 @@ from model.simulation import SimulationModel
 
 
 class SimulationModelSync(SimulationModel):
-    def run_sync(self, delay=0.01):
+    def run_sync(self, delay=0.1):
         self.active = True
 
         while self.active:

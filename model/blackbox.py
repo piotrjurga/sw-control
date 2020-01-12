@@ -4,11 +4,12 @@ from multiprocessing import Manager
 from core.api import API
 from config import *
 
-# FIXME: StatsContainer: gromadzenie danych i ich wizualizacja
+from prometheus_client import start_http_server, Gauge
 
 
 class ProxyDict:
     api = API()
+    stats = {}
     storage = []
     fake = False
 
@@ -45,6 +46,10 @@ class ProxyDict:
         for obj in self.storage:
             for key in obj.state.keys():
                 obj.state[key] = self.api.recv(key)
+                # FIXME: friendly function like send_stat singleton
+                if key not in self.stats:
+                    self.stats[key] = Gauge(f"proxydict_{key}", key)
+                self.stats[key].set(obj.state[key])
 
 
 class BlackBoxModel:
@@ -55,6 +60,12 @@ class BlackBoxModel:
     def __init__(self, modules=[Control, Measure]):
         for module in modules:
             self.state.add(module(self.manager))
+
+        global METRICS_PORT
+        from prometheus_client import start_http_server
+
+        print("\033[90--- OMG ---\033[m")
+        start_http_server(METRICS_PORT)
 
     async def run(self, delay=0.01):
         self.active = True

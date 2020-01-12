@@ -1,5 +1,9 @@
+# metrics for debug
+data/
+
 # ignore log files
 *.csv
 
 # ignore python bytecode
+.DS_Store
 __pycache__

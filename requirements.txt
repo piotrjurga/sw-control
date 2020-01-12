@@ -1,3 +1,4 @@
 sanic
 pandas
 requests
+prometheus_client
