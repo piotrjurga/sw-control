@@ -8,6 +8,11 @@ from prometheus_client import start_http_server, Gauge
 
 
 class ProxyDict:
+    """
+    Tutaj przeczymywane sa aktualne stany, na bazie ktorych
+    glowny algorytm sterujacy podejmuje decyzje
+    """
+
     api = API()
     stats = {}
     storage = []
@@ -19,12 +24,14 @@ class ProxyDict:
     def add(self, obj):
         self.storage.append(obj)
 
+    # zwaraca aktualne potwierdzone stany
     def __getitem__(self, key):
         for obj in self.storage:
             if key in obj.state:
                 return obj.state[key]
         return None
 
+    # wysylamy + czekamy na potwierdzenie
     def __setitem__(self, key, val):
         for obj in self.storage:
             if key in obj.state:
@@ -40,6 +47,7 @@ class ProxyDict:
             result.update(obj.state)
         return result
 
+    # co pewien czas aktualizujemy wlasne stany
     def update(self):
         if self.fake:
             return
@@ -52,11 +60,14 @@ class ProxyDict:
                 self.stats[key].set(obj.state[key])
 
 
+# algorithm <--BlackBoxModel--> I/O interface
+#   "glowne zadanie to aktualizacja stanow"
 class BlackBoxModel:
     state = ProxyDict()
     manager = Manager()
     active = False
 
+    # odpalenie serwera statystyk
     def __init__(self, modules=[Control, Measure]):
         for module in modules:
             self.state.add(module(self.manager))
@@ -67,6 +78,7 @@ class BlackBoxModel:
         print("\033[90--- OMG ---\033[m")
         start_http_server(METRICS_PORT)
 
+    # co `delay` zapisuje stan
     async def run(self, delay=0.01):
         self.active = True
 
