@@ -1,3 +1,19 @@
+"""
+Tutaj znajduje sie konfiguracja calego ukladu, czyli takie informacje jak
+ile jest pomp, zawarow albo czujnikow.
+Wszystkie stany beda przechowywane w odpowiednich klasach.
+
+Measure - tylko stany ktore mozemy z czytac ale nie modyfikowac
+          (np. poziom wody, temperatura)
+Control - stany ktore mozemy modyfikowac programowo
+          (np. otwieranie/zamykanie zaworu, wlaczenie/wylaczenie pompy)
+
+Dodatkowo:
+
+METRICS_* - zmienne do zapisywania danych historycznych
+HARDWARE_* - gdzie znajduje sie I/O intefejs ktorym chcemy sterowac
+"""
+
 # FIXME: w nadziei ze bedzie mozna modelowac rozne struktury
 
 # hardware information

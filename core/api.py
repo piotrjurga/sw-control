@@ -28,6 +28,7 @@ class API:
         response = requests.get(uri, json=data)
         return response.json()["result"]
 
+    # proba o zmiane stanu do I/O
     def send(self, key, val):
         global HARDWARE_URI
 
@@ -45,6 +46,7 @@ class API:
         response = requests.get(uri, json=data)
         return response.json()["result"]
 
+    # odczytanie stanu z I/O
     def recv(self, key):
         global HARDWARE_URI
 

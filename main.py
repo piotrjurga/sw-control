@@ -1,3 +1,12 @@
+"""
+Tutaj znajduje sie plik z algorytmem sterowania 
+zgodny z wyslana specyfikacja.
+
+Ten plik korzysta z konfiguracji oraz konteneru zawartego w `model/`
+tam znajduje sie implementacja symulacji (SimulationModel) oraz
+prawdziwego environmentu (BlackBoxModel).
+"""
+
 import asyncio as aio
 import time
 import pandas as pd
@@ -19,7 +28,7 @@ KEYS = ["timestamp"] + METERS + VALVES + PUMPS
 # settings
 C1_max, C2_max, C3_max, C4_max, C5_max = 100, 10, 10, 10, 100
 C1_min, C2_min, C3_min, C4_min, C5_min = 0.1, 0.1, 0.1, 0.1, 0.1
-T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 2, 2, 2, 2, 2
+T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 8, 8, 8, 8, 2
 C2_rd, C3_rd, C4_rd = 1, 1, 1
 C2_rg, C3_rg, C4_rg = 8, 8, 8
 report_dir = "."
@@ -37,6 +46,11 @@ cycle = None
 
 
 class Cycle:
+    """
+    Akcje wykonywane po uplywie pelnego cyklu.
+    (zapisanie do pliku, elapsed_time, potwierdzone stany)
+    """
+
     def __init__(self, purifier):
         self.history = pd.DataFrame(columns=KEYS)
         self.start_time = time.time()
@@ -72,6 +86,7 @@ class Cycle:
             self.state[id] = self.purifier.state[id]
 
 
+# funkcja do wypisywania na ekran
 def log(s, color=None):
     # todo: something more sophisticated
     if color is None:
@@ -80,15 +95,18 @@ def log(s, color=None):
         print(f"\033[{color}m{s}\033[m", file=stderr)
 
 
+# mock: dla czasu
 def get_elapsed() -> float:
     return cycle.elapsed_time()
 
 
+# mock: dla czujnika poziomu wody
 def get_level(id) -> float:
     assert id in METERS
     return cycle.state[id]
 
 
+# rozkaz dla pompy
 async def set_pump(id, state: bool):
     # todo: implement me
     assert id in PUMPS
@@ -101,6 +119,7 @@ async def set_pump(id, state: bool):
     # cycle.state[id] = state
 
 
+# rozkad dla zawaru
 def set_valve(id, state: bool):
     # todo: implement me
     assert id in VALVES
@@ -110,6 +129,7 @@ def set_valve(id, state: bool):
     # cycle.state[id] = state
 
 
+# sprawdzenie czy mamy zapowietzenie
 async def check_for_airlock(pump, meter):
     assert pump in PUMPS
     assert meter in METERS
@@ -126,39 +146,50 @@ async def check_for_airlock(pump, meter):
                     await set_pump(p, 0)
             while max(recent_meter) - min(recent_meter) < delta:
                 await aio.sleep(delay)
-                recent_meter = cycle.history[meter][
-                    -min_frames_without_change:]
+                recent_meter = cycle.history[meter][-min_frames_without_change:]
             for p in PUMPS:
                 await set_pump(p, previous_state[p])
             cycle.airlocked = False
             log(f"airlock of {pump} resolved, unlocking other pumps")
 
 
+# FAZA 1
 async def phase_1():
     log("entered phase 1", color=92)
     if get_level(C1) >= C1_max:
         return
     await set_pump(P1, 1)
-    while get_level(C1) >= C1_max:
+    while not (get_level(C1) >= C1_max):
         await aio.sleep(delay)
     await set_pump(P1, 0)
     log("exiting phase 1")
 
 
+# FAZA 2
 async def phase_2():
     log("entered phase 2", color=92)
     # TODO(piotr): should we check for airlocks here? the meter level
     # may be constant naturally as the pumps are potentially on
-    while get_elapsed() < T_ust1:
-        while not (get_level(C1) < C1_max and get_level(C5) > C5_min):
+    while True:
+        while get_elapsed() < T_ust1 and not (
+            get_level(C1) < C1_max and get_level(C5) > C5_min
+        ):
             await aio.sleep(delay)
+        if get_elapsed() >= T_ust1:
+            break
         await set_pump(P1, 1)
-        while not (get_level(C1) >= C1_max and get_level(C5) <= C5_min):
+        while get_elapsed() < T_ust1 and not (
+            get_level(C1) >= C1_max and get_level(C5) <= C5_min
+        ):
             await aio.sleep(delay)
+        if get_elapsed() >= T_ust1:
+            break
         await set_pump(P1, 0)
+    await set_pump(P1, 0)
     log("exiting phase 2")
 
 
+# FAZA 3
 async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     log(f"entered phase 3 (pump {P_i})", color=92)
     await set_pump(P_i, 1)
@@ -170,11 +201,15 @@ async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     # TODO(piotr): should we check for airlocks here? the meter level
     # may be constant naturally as the valve is open
     while get_elapsed() < t_ust:
-        while not get_level(C_i) > c_rg:
+        while get_elapsed() < t_ust and not get_level(C_i) > c_rg:
             await aio.sleep(delay)
+        if get_elapsed() >= t_ust:
+            break
         await set_pump(P_i, 0)
-        while not get_level(C_i) < c_rd:
+        while get_elapsed() < t_ust and not get_level(C_i) < c_rd:
             await aio.sleep(delay)
+        if get_elapsed() >= t_ust:
+            break
         await set_pump(P_i, 1)
 
     await set_pump(P_i, 0)
@@ -184,6 +219,7 @@ async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     log(f"exiting phase 3 (pump {P_i})")
 
 
+# FAZA 4
 async def phase_4():
     log(f"entered phase 4", color=92)
     if not get_level(C1) < C1_max:
@@ -204,6 +240,8 @@ async def measure(delay):
         await aio.sleep(delay)
 
 
+# rdzen algorytmu sterowania:
+# czyli definicja przejsc z fazy do fazy
 async def control():
     await phase_1()
     tasks = [
@@ -217,13 +255,19 @@ async def control():
     cycle.active = False
 
 
+# wypisywanie na ekran
 async def print_vals():
     log("print_vals", color=92)
     while cycle.active:
         print(f"state: {cycle.purifier.state()}")
+        print(f"time: {get_elapsed()}")
         await aio.sleep(1)
 
 
+# podczas cyklu nalezy:
+#   1) mierzyc stany - measure(delay=measure_delay)
+#   2) kontrolowac uklad - control()
+#   3) wypisywac/zapisywac wartosci - print_vals()
 async def cycle_loop():
     global cycle
     while True:
@@ -235,6 +279,9 @@ async def cycle_loop():
         cycle.save_history(report_dir)
 
 
+# rozpoczynamy sterowanie:
+#   1) polaczenie z I/O - purifier.run(delay=delay)
+#   2) cykle sterowania - cycle_loop()
 async def start():
     global purifier
     purifier = environment()

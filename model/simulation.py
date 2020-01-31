@@ -12,7 +12,7 @@ class FakeMeasure(Measure):
         C2: MIN[C2],
         C3: MIN[C3],
         C4: MIN[C4],
-        C5: MIN[C5] + 1,
+        C5: MIN[C5] + 10,
     }
 
 
@@ -24,7 +24,8 @@ class SimulationModel(BlackBoxModel):
     state = ProxyDict(fake=True)
 
     # speeds in level units transported per second (assume equal diameters)
-    SPEED = {k: 0.5 for k in PUMPS + VALVES}
+    SPEED = {k: 5 for k in PUMPS}
+    SPEED.update({k: 1 for k in VALVES})
 
     SOURCE = {P1: C5, P2: C1, P3: C1, P4: C1, Y1: C2, Y2: C3, Y3: C4}
     TARGET = {P1: C1, P2: C2, P3: C3, P4: C4, Y1: C5, Y2: C5, Y3: C5}
