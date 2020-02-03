@@ -16,11 +16,7 @@ from os import path
 from datetime import datetime
 
 from config import *
-from model.blackbox import BlackBoxModel
-from model.simulation import SimulationModel
-
-# environment = SimulationModel
-environment = BlackBoxModel
+from embedded import *
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
@@ -76,14 +72,9 @@ class Cycle:
         self.history = self.history.append([self.state], ignore_index=True)
 
     def update_state(self):
-        # TODO(maciej): okay, czyli purifier musi byc Adapterem (API request)
         self.state["timestamp"] = time.time()
-        for id in VALVES:
-            self.state[id] = self.purifier.state[id]
-        for id in PUMPS:
-            self.state[id] = self.purifier.state[id]
-        for id in METERS:
-            self.state[id] = self.purifier.state[id]
+        for id in VALVES + PUMPS + METERS:
+            self.state[id] = readData(id)
 
 
 # funkcja do wypisywania na ekran
@@ -284,6 +275,7 @@ async def cycle_loop():
 #   2) cykle sterowania - cycle_loop()
 async def start():
     global purifier
+    setup()
     purifier = environment()
     # XXX:   symulacja       sterowanie
     tasks = [purifier.run(delay=delay), cycle_loop()]
