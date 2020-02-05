@@ -8,12 +8,12 @@ prawdziwego environmentu (BlackBoxModel).
 """
 
 import asyncio as aio
-import time
 import pandas as pd
 
 from sys import stderr
 from os import path
 from datetime import datetime
+from time import time
 
 from config import *
 from embedded import *
@@ -22,8 +22,10 @@ from embedded import *
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
 
 # settings
-C1_max, C2_max, C3_max, C4_max, C5_max = 100, 10, 10, 10, 100
-C1_min, C2_min, C3_min, C4_min, C5_min = 0.1, 0.1, 0.1, 0.1, 0.1
+C_cap = [33, 20, 16, 21, 33]
+# FIXME: HOT FIX (C3_czujnik)
+C1_max, C2_max, C3_max, C4_max, C5_max = C_max = 14, 10, 9.0, 8, 20
+C1_min, C2_min, C3_min, C4_min, C5_min = C_min = 8, 4, 8.9, 4, 5
 T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 8, 8, 8, 8, 2
 C2_rd, C3_rd, C4_rd = 1, 1, 1
 C2_rg, C3_rg, C4_rg = 8, 8, 8
@@ -47,13 +49,12 @@ class Cycle:
     (zapisanie do pliku, elapsed_time, potwierdzone stany)
     """
 
-    def __init__(self, purifier):
+    def __init__(self):
         self.history = pd.DataFrame(columns=KEYS)
-        self.start_time = time.time()
+        self.start_time = time()
         self.state = {k: None for k in KEYS}
         self.active = True
         self.airlocked = False
-        self.purifier = purifier
         self.update_state()
         self.shift_state()
 
@@ -66,15 +67,25 @@ class Cycle:
         self.history.to_csv(report_path)
 
     def elapsed_time(self):
-        return time.time() - self.start_time
+        return time() - self.start_time
 
     def shift_state(self):
         self.history = self.history.append([self.state], ignore_index=True)
 
     def update_state(self):
-        self.state["timestamp"] = time.time()
-        for id in VALVES + PUMPS + METERS:
-            self.state[id] = readData(id)
+        self.state["timestamp"] = time()
+        for i, id in enumerate(METERS):
+            self.state[id] = max(0, C_cap[i] - readData(id))
+            sleep(0.1)
+
+        for id in VALVES + PUMPS:
+            if self.state[id] is None:
+                self.state[id] = 0
+        print(
+            ", ".join(
+                f"{x} {float(self.state[x]):.2f}" for x in METERS + VALVES
+            )
+        )
 
 
 # funkcja do wypisywania na ekran
@@ -105,9 +116,8 @@ async def set_pump(id, state: bool):
         while cycle.airlocked:
             await aio.sleep(delay)
     log(f"set pump {id} from {cycle.state[id]} to {state}")
-    # XXX: cycle.purifier.control.set_pump(id, state)
-    cycle.purifier.state[id] = state
-    # cycle.state[id] = state
+    cycle.state[id] = state
+    switchState(id, state)
 
 
 # rozkad dla zawaru
@@ -115,9 +125,8 @@ def set_valve(id, state: bool):
     # todo: implement me
     assert id in VALVES
     log(f"set valve {id} from {cycle.state[id]} to {state}")
-    # XXX: cycle.purifier.control.set_valve(id, state)
-    cycle.purifier.state[id] = state
-    # cycle.state[id] = state
+    cycle.state[id] = state
+    switchState(id, state)
 
 
 # sprawdzenie czy mamy zapowietzenie
@@ -149,6 +158,11 @@ async def phase_1():
     log("entered phase 1", color=92)
     if get_level(C1) >= C1_max:
         return
+
+    await set_pump(P2, 0)
+    await set_pump(P3, 0)
+    await set_pump(P4, 0)
+
     await set_pump(P1, 1)
     while not (get_level(C1) >= C1_max):
         await aio.sleep(delay)
@@ -250,8 +264,6 @@ async def control():
 async def print_vals():
     log("print_vals", color=92)
     while cycle.active:
-        print(f"state: {cycle.purifier.state()}")
-        print(f"time: {get_elapsed()}")
         await aio.sleep(1)
 
 
@@ -263,7 +275,7 @@ async def cycle_loop():
     global cycle
     while True:
         log("--- started cycle ---", color=94)
-        cycle = Cycle(purifier)
+        cycle = Cycle()
         tasks = [measure(delay=measure_delay), control(), print_vals()]
         await aio.gather(*tasks)
         log("--- exiting cycle ---", color=94)
@@ -274,11 +286,7 @@ async def cycle_loop():
 #   1) polaczenie z I/O - purifier.run(delay=delay)
 #   2) cykle sterowania - cycle_loop()
 async def start():
-    global purifier
-    setup()
-    purifier = environment()
-    # XXX:   symulacja       sterowanie
-    tasks = [purifier.run(delay=delay), cycle_loop()]
+    tasks = [cycle_loop()]
     await aio.gather(*tasks)
 
 
