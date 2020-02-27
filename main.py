@@ -341,6 +341,16 @@ async def get_config(req):
     return jsonify(C_min=C_min, C_max=C_max, C_cap=C_cap, T_ust=T_ust)
 
 
+async def put_config(req):
+    global C_min, C1_min, C2_min, C3_min, C4_min, C5_min
+    global C_max, C1_max, C2_max, C3_max, C4_max, C5_max
+    body = await req.json()
+    C1_min, C2_min, C3_min, C4_min, C5_min = C_min = body['C_min']
+    C1_max, C2_max, C3_max, C4_max, C5_max = C_max = body['C_max']
+    log(f'-- put_config(C_min={C_min}, C_max={C_max})')
+    return Response(status=200)
+
+
 async def get_history(req):
     params = req.rel_url.query
     df = cycle.history
@@ -390,6 +400,7 @@ def make_app(args):
     app = web.Application()
     app.router.add_get(r'/status', get_status)
     app.router.add_get(r'/config', get_config)
+    app.router.add_put(r'/config', put_config)
     app.router.add_get(r'/history', get_history)
     app.router.add_put(r'/manual', put_manual)
     app.router.add_put(r'/manual/{type:(pump|valve)}/{id}', put_state)
