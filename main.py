@@ -25,7 +25,7 @@ KEYS = ["timestamp"] + METERS + VALVES + PUMPS
 # timings
 measure_delay = 0.01
 delay = 0.01
-auto = True
+manual = False
 
 # conditions for detecting an airlock
 min_frames_without_change = 5
@@ -34,12 +34,16 @@ min_meter_delta = 0.5 * measure_delay
 # current cycle
 cycle = None
 
+control_task = None
+
 # aiohttp sessions
 db_session_timeout = aiohttp.ClientTimeout(connect=DB_TIMEOUT)
 db_session = None
 
+
 def clip(x, mini, maxi):
     return max(min(x, maxi), mini)
+
 
 def to_int(s):
     try:
@@ -47,8 +51,18 @@ def to_int(s):
     except:
         return None
 
+
+def log(s, color=None):
+    # todo: something more sophisticated
+    if color is None:
+        print(s, file=stderr)
+    else:
+        print(f"\033[{color}m{s}\033[m", file=stderr)
+
+
 def jsonify(**kwargs):
     return web.json_response(kwargs)
+
 
 class Cycle:
     """
@@ -60,7 +74,6 @@ class Cycle:
         self.history = pd.DataFrame(columns=KEYS)
         self.start_time = time()
         self.state = {k: None for k in KEYS}
-        self.active = True
         self.airlocked = False
         self.update_state()
         self.shift_state()
@@ -88,16 +101,6 @@ class Cycle:
         for id in VALVES + PUMPS:
             if self.state[id] is None:
                 self.state[id] = 0
-        print(', '.join(f'{x} {float(self.state[x]):.2f}' for x in METERS + VALVES))
-
-
-# funkcja do wypisywania na ekran
-def log(s, color=None):
-    # todo: something more sophisticated
-    if color is None:
-        print(s, file=stderr)
-    else:
-        print(f"\033[{color}m{s}\033[m", file=stderr)
 
 
 # mock: dla czasu
@@ -172,7 +175,6 @@ async def phase_1():
     log("exiting phase 1")
 
 
-# FAZA 2
 async def phase_2():
     log("entered phase 2", color=92)
     # TODO(piotr): should we check for airlocks here? the meter level
@@ -238,8 +240,8 @@ async def phase_4():
 
 
 async def measure(delay):
-    log(f"measure={delay}", color=92)
-    while cycle.active:
+    log(f"-- measure(delay={delay})", color=92)
+    while True:
         cycle.update_state()
         cycle.shift_state()
         await post_vals()
@@ -258,13 +260,13 @@ async def control():
     ]
     await aio.gather(*tasks)
     await phase_4()
-    cycle.active = False
 
 
 # wypisywanie na ekran
 async def print_vals():
-    log("print_vals", color=92)
-    while cycle.active:
+    log("-- print_vals", color=92)
+    while True:
+        print(', '.join(f'{x} {float(cycle.state[x]):.2f}' for x in METERS + VALVES))
         await aio.sleep(1)
 
 
@@ -278,7 +280,7 @@ async def post_vals():
             for i, x in enumerate(VALVES)]
     ps = [dict(pump_id=str(i+1), pump_state=bool(cycle.state[x]))
             for i, x in enumerate(PUMPS)]
-    ss = 'AU' if auto else 'MA'
+    ss = 'RM' if manual else 'AU'
     data = {
         'steering_state': ss, 'timestamp': ts,
         'valves': ys, 'containers': cs, 'pumps': ps,
@@ -286,7 +288,24 @@ async def post_vals():
     try:
         await db_session.post(DB_URL, json=data)
     except:
-        pass
+        return
+
+async def run_cycle():
+    while True:
+        try:
+            global cycle
+            global control_task
+            log("--- started cycle ---", color=94)
+            cycle = Cycle()
+            control_task = aio.Task(control())
+            await control_task
+        except aio.CancelledError:
+            log("--- manual mode ---", color=94)
+            while manual:
+                await aio.sleep(delay)
+        finally:
+            cycle.save_history(REPORT_DIR)
+            log("--- exiting cycle ---", color=94)
 
 
 # podczas cyklu nalezy:
@@ -295,15 +314,12 @@ async def post_vals():
 #   3) wypisywac/zapisywac wartosci - print_vals()
 async def cycle_loop():
     global cycle
-    while True:
-        log("--- started cycle ---", color=94)
-        cycle = Cycle()
-        tasks = [measure(delay=measure_delay), print_vals()]
-        if auto:
-            tasks.append(control())
-        await aio.gather(*tasks)
-        log("--- exiting cycle ---", color=94)
-        cycle.save_history(report_dir)
+    cycle = Cycle()
+    await aio.gather(
+        measure(delay=measure_delay),
+        print_vals(),
+        run_cycle(),
+    )
 
 
 async def on_startup(app):
@@ -335,16 +351,19 @@ async def get_history(req):
 
 
 async def put_manual(req):
-    global auto
+    global manual
     body = await req.json()
     state = body['steering_state']
-    if state == 'RM': auto = False
-    if state == 'ID': auto = True
+    if not manual and state in ['RM', 'manual']:
+        manual = True
+        control_task.cancel()
+    if state in ['ID', 'auto']:
+        manual = False
     return Response(status=200)
 
 
 async def put_state(req):
-    if auto:
+    if not manual:
         return Response(status=403)
 
     body = await req.json()
