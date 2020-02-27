@@ -80,7 +80,7 @@ GET /config -> {
 - data.steering_state: RM/ID
 
 ```
-POST /manual
+PUT /manual
 ```
 
 ### Zmiana stanu
