@@ -1,10 +1,6 @@
 """
 Tutaj znajduje sie plik z algorytmem sterowania 
 zgodny z wyslana specyfikacja.
-
-Ten plik korzysta z konfiguracji oraz konteneru zawartego w `model/`
-tam znajduje sie implementacja symulacji (SimulationModel) oraz
-prawdziwego environmentu (BlackBoxModel).
 """
 
 import asyncio as aio
@@ -13,23 +9,14 @@ import pandas as pd
 from sys import stderr
 from os import path
 from datetime import datetime
-from time import time
+from time import time, sleep
+from aiohttp import web
 
 from config import *
 from embedded import *
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
-
-# settings
-C_cap = [33, 20, 16, 21, 33]
-# FIXME: HOT FIX (C3_czujnik)
-C1_max, C2_max, C3_max, C4_max, C5_max = C_max = 14, 10, 9.0, 8, 20
-C1_min, C2_min, C3_min, C4_min, C5_min = C_min = 8, 4, 8.9, 4, 5
-T_ust1, T_ust2, T_ust3, T_ust4, T_ust5 = 8, 8, 8, 8, 2
-C2_rd, C3_rd, C4_rd = 1, 1, 1
-C2_rg, C3_rg, C4_rg = 8, 8, 8
-report_dir = "."
 
 # timings
 measure_delay = 0.01
@@ -42,6 +29,8 @@ min_meter_delta = 0.5 * measure_delay
 # current cycle
 cycle = None
 
+def jsonify(**kwargs):
+    return web.json_response(kwargs)
 
 class Cycle:
     """
@@ -81,11 +70,7 @@ class Cycle:
         for id in VALVES + PUMPS:
             if self.state[id] is None:
                 self.state[id] = 0
-        print(
-            ", ".join(
-                f"{x} {float(self.state[x]):.2f}" for x in METERS + VALVES
-            )
-        )
+        print(', '.join(f'{x} {float(self.state[x]):.2f}' for x in METERS + VALVES))
 
 
 # funkcja do wypisywania na ekran
@@ -282,13 +267,33 @@ async def cycle_loop():
         cycle.save_history(report_dir)
 
 
-# rozpoczynamy sterowanie:
-#   1) polaczenie z I/O - purifier.run(delay=delay)
-#   2) cykle sterowania - cycle_loop()
-async def start():
-    tasks = [cycle_loop()]
-    await aio.gather(*tasks)
+async def on_startup(app):
+    app['cycle'] = app.loop.create_task(cycle_loop())
+
+
+async def on_cleanup(app):
+    #app['cycle'].cancel()
+    #await app['cycle']
+    pass
+
+
+async def get_status(req):
+    if cycle is None: return jsonify(status='error', message='cycle not in progress')
+    return jsonify(status='ok', state=cycle.state)
+
+
+async def get_config(req):
+    return jsonify(status='ok', C_min=C_min, C_max=C_max, C_cap=C_cap, T_ust=T_ust)
+
+
+def make_app(args):
+    app = web.Application()
+    app.router.add_get('/status', get_status)
+    app.router.add_get('/config', get_config)
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
+    return app
 
 
 if __name__ == "__main__":
-    aio.run(start())
+    web.run_app(make_app())

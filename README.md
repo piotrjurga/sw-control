@@ -1,52 +1,63 @@
-## Uruchomienie (uklad sterowania)
+# Sterowanie
 
-Aby system dzialal prawidlowo nalezy odpalic dwa osobne komponenty:
-(a) _hardware_ - czyli komunikacja I/O z zawarami i czujnikami
-(b) _control/main_ - czyli jak manipulowac I/O aby osiagnac dany stan
+## Uruchomienie
 
-Dlatego najpierw musimy odpalic _hardware_:
-
-```bash
-pi@local $ python3 realhardware.py # hardware I/O
-albo
-$ python3 hardware.py # (simulated) hardware I/O
-```
-
-A pozniej skrypt sterujacy (_control_):
+Skrytpt wymaga Pythona >= 3.8, więc też Raspbiana w wersji Buster lub nowszej.
+Trzeba zainstalować wymagane paczki z apt (a nie z pip!).
 
 ```bash
-pi@local $ python3 main.py         # to steer the ship ;-)
+$ apt install python3-pandas python3-aiohttp
 ```
 
-Gdy spojrzymy na zawartosc pliku `realhardware.py` zobaczymy ze mamy tam API
-ktore pozwala na zczytywanie stanow oraz wysylanie rozkazow.
-Natomiast w pliku `core/api.py` mamy analogiczna sytuacje tylko ze dla ukladu
-sterowania.
-
----
-
-## Inspekcja (dodatkowy krok)
-
-![](docs/screen.png)
-
-Aby uzyskac _dashboard_ taki jak u gory nalezy z innego urzadzenia polaczyc sie
-z naszym systemem sterowania.
-
-Potrzebne beda potrzebne dodatkowe pakiety:
+Następnie można włączyć serwer:
 
 ```bash
-$ brew install grafana     # odpalamy na swoim komputerze (dashboardy/wykresy)
-pi@local $ brew install prometheus  # odpalamy na ukladzie sterowania (baza danych)
+$ python3 -m aiohttp.web -H 0.0.0.0 -P 8080 main:make_app
+# albo
+$ python3 main.py
 ```
 
-Na swoim komputerze nalezy odpalic _Grafana_ oraz wczytac plik `grafana.json`:
+## API
 
-```bash
-$ grafana-server --config=/usr/local/etc/grafana/grafana.ini --homepath /usr/local/share/grafana --packaging=brew cfg:default.paths.logs=/usr/local/var/log/grafana cfg:default.paths.data=/usr/local/var/lib/grafana cfg:default.paths.plugins=/usr/local/var/lib/grafana/plugins
+Aktualne pomiary:
+- timestamp: czas uniksowy w sekundach (float!)
+- Ci: poziom zbiornika
+- Yi: status zaworu (1: otwarty)
+- Pi: status pompy (1: włączona)
+
+```
+GET /status -> {
+    "status": "ok",
+    "state": {
+        "timestamp": 1582809916.5852017,
+        "C1": 33, "C2": 20, "C3": 16, "C4": 21, "C5": 33,
+        "Y1": 1, "Y2": 1, "Y3": 1,
+        "P1": 0, "P2": 0, "P3": 0, "P4": 0
+    }
+}
 ```
 
-A na ukladzie sterowania nalezy wlaczyc zapisywanie do bazy czyli:
+Aktualna konfiguracja:
+- C_min: minimalna pojemność zbiornika przy której może być włączona pompa
+- C_max: maksymalna pojemność zbiornika przy której może być otwarty zawór
+- C_cap: pojemność danego zbiornika
+- T_ust: ustawienia czasowe
 
 ```
-pi@local $ prometheus
+GET /config -> {
+    "status": "ok",
+    "C_min": [8, 4, 8.9, 4, 5],
+    "C_max": [14, 8, 9.0, 8, 20],
+    "C_cap": [33, 20, 16, 21, 33],
+    "T_ust": [8, 8, 8, 8, 2]
+}
 ```
+
+Informacja o błędnym zapytaniu:
+- status: ok/error
+- message: wiadomość dla programisty
+
+```
+ERROR -> {"status": "error", "message": "..."}
+```
+

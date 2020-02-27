@@ -1,4 +1,2 @@
-sanic
+aiohttp
 pandas
-requests
-prometheus_client

@@ -1,8 +1,0 @@
-name: embedded
-channels:
-  - conda-forge
-dependencies:
-  - python>=3.8
-  - pip
-  - pip:
-    - -r file:requirements.txt
