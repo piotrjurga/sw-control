@@ -75,6 +75,21 @@ GET /config -> {
 }
 ```
 
+### Zmiana konfiguracji
+
+- C_min: minimalna pojemność zbiornika przy której może być włączona pompa
+- C_max: maksymalna pojemność zbiornika przy której może być otwarty zawór
+- Ograniczenia: 0 < C_min < C_max < C_cap
+
+```
+PUT /config
+{
+    "C_min": [C1_min, C2_min, C3_min, C4_min, C5_min],
+    "C_max": [C1_max, C2_max, C3_max, C4_max, C5_max]
+}
+200 - OK
+```
+
 ### Tryb manualny
 
 - data.steering_state: RM/ID
