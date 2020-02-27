@@ -17,6 +17,8 @@ $ python3 -m aiohttp.web -H 0.0.0.0 -P 8080 main:make_app
 $ python3 main.py
 ```
 
+Serwer wysyła stan na adres `DB_URL`, do ustawienia w `config.py`.
+
 ## API
 
 ### Aktualne pomiary
@@ -28,7 +30,6 @@ $ python3 main.py
 
 ```
 GET /status -> {
-    "status": "ok",
     "state": {
         "timestamp": 1582809916.5852017,
         "C1": 33, "C2": 20, "C3": 16, "C4": 21, "C5": 33,
@@ -48,7 +49,6 @@ GET /status -> {
 
 ```
 GET /history?last=int -> {
-    "status": "ok",
     "state": {
         "timestamp": [1582809916.5852017, ...],
         "C1": [33, 33, ...],
@@ -68,7 +68,6 @@ GET /history?last=int -> {
 
 ```
 GET /config -> {
-    "status": "ok",
     "C_min": [8, 4, 8.9, 4, 5],
     "C_max": [14, 8, 9.0, 8, 20],
     "C_cap": [33, 20, 16, 21, 33],
@@ -76,12 +75,19 @@ GET /config -> {
 }
 ```
 
-### Informacja o błędnym zapytaniu
+### Tryb manualny
 
-- status: ok/error
-- message: wiadomość dla programisty
+- data.steering_state: RM/ID
 
 ```
-ERROR -> {"status": "error", "message": "..."}
+POST /manual
 ```
 
+### Zmiana stanu
+
+- type: pump/valve
+- data.state = true/false
+
+```
+PUT /manual/<type>/<id>
+```

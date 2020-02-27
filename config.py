@@ -19,3 +19,8 @@ C2_rd, C3_rd, C4_rd = 1, 1, 1
 C2_rg, C3_rg, C4_rg = 8, 8, 8
 # where to write cycle reports
 report_dir = "logs"
+
+STATION_ID = 1
+DB_HOST = 'http://127.0.0.1:8000'
+DB_URL = f'{DB_HOST}/water/{STATION_ID}/stats/'
+DB_TIMEOUT = 0.5

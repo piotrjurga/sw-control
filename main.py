@@ -5,17 +5,19 @@ zgodny z wyslana specyfikacja.
 
 import asyncio as aio
 import pandas as pd
+import aiohttp
 
 from sys import stderr
 from os import path
 from datetime import datetime
 from time import time, sleep
 from aiohttp import web
+from aiohttp.web import Response
 
 from config import *
-from embedded import *
-#def switchState(x,y): pass
-#def readData(x): return 0
+#from embedded import *
+def switchState(x,y): pass
+def readData(x): return 0
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
@@ -23,6 +25,7 @@ KEYS = ["timestamp"] + METERS + VALVES + PUMPS
 # timings
 measure_delay = 0.01
 delay = 0.01
+auto = True
 
 # conditions for detecting an airlock
 min_frames_without_change = 5
@@ -30,6 +33,10 @@ min_meter_delta = 0.5 * measure_delay
 
 # current cycle
 cycle = None
+
+# aiohttp sessions
+db_session_timeout = aiohttp.ClientTimeout(connect=DB_TIMEOUT)
+db_session = None
 
 def clip(x, mini, maxi):
     return max(min(x, maxi), mini)
@@ -149,7 +156,6 @@ async def check_for_airlock(pump, meter):
             log(f"airlock of {pump} resolved, unlocking other pumps")
 
 
-# FAZA 1
 async def phase_1():
     log("entered phase 1", color=92)
     if get_level(C1) >= C1_max:
@@ -190,7 +196,6 @@ async def phase_2():
     log("exiting phase 2")
 
 
-# FAZA 3
 async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     log(f"entered phase 3 (pump {P_i})", color=92)
     await set_pump(P_i, 1)
@@ -220,7 +225,6 @@ async def phase_3(P_i, Y_i, C_i, c_min, c_rd, c_rg, t_ust):
     log(f"exiting phase 3 (pump {P_i})")
 
 
-# FAZA 4
 async def phase_4():
     log(f"entered phase 4", color=92)
     if not get_level(C1) < C1_max:
@@ -238,6 +242,7 @@ async def measure(delay):
     while cycle.active:
         cycle.update_state()
         cycle.shift_state()
+        await post_vals()
         await aio.sleep(delay)
 
 
@@ -263,6 +268,27 @@ async def print_vals():
         await aio.sleep(1)
 
 
+async def post_vals():
+    s = cycle.state
+    ts = cycle.state['timestamp']
+    ts = datetime.utcfromtimestamp(ts).strftime('%Y-%m-%dT%H:%M:%S.%f')
+    cs = [dict(container_id=str(i+1), container_state=cycle.state[x])
+            for i, x in enumerate(METERS)]
+    ys = [dict(valve_id=str(i+1), valve_state=bool(cycle.state[x]))
+            for i, x in enumerate(VALVES)]
+    ps = [dict(pump_id=str(i+1), pump_state=bool(cycle.state[x]))
+            for i, x in enumerate(PUMPS)]
+    ss = 'AU' if auto else 'MA'
+    data = {
+        'steering_state': ss, 'timestamp': ts,
+        'valves': ys, 'containers': cs, 'pumps': ps,
+    }
+    try:
+        await db_session.post(DB_URL, json=data)
+    except:
+        pass
+
+
 # podczas cyklu nalezy:
 #   1) mierzyc stany - measure(delay=measure_delay)
 #   2) kontrolowac uklad - control()
@@ -272,27 +298,31 @@ async def cycle_loop():
     while True:
         log("--- started cycle ---", color=94)
         cycle = Cycle()
-        tasks = [measure(delay=measure_delay), control(), print_vals()]
+        tasks = [measure(delay=measure_delay), print_vals()]
+        if auto:
+            tasks.append(control())
         await aio.gather(*tasks)
         log("--- exiting cycle ---", color=94)
         cycle.save_history(report_dir)
 
 
 async def on_startup(app):
+    global db_session
     app['cycle'] = app.loop.create_task(cycle_loop())
+    db_session = aiohttp.ClientSession(timeout=db_session_timeout)
 
 
 async def on_cleanup(app):
-    pass
+    await db_session.close()
 
 
 async def get_status(req):
-    if cycle is None: return jsonify(status='error', message='cycle not in progress')
-    return jsonify(status='ok', state=cycle.state)
+    if cycle is None: return jsonify(state={})
+    return jsonify(state=cycle.state)
 
 
 async def get_config(req):
-    return jsonify(status='ok', C_min=C_min, C_max=C_max, C_cap=C_cap, T_ust=T_ust)
+    return jsonify(C_min=C_min, C_max=C_max, C_cap=C_cap, T_ust=T_ust)
 
 
 async def get_history(req):
@@ -301,18 +331,53 @@ async def get_history(req):
     tail = to_int(params.get('last', None))
     if tail is not None:
         df = df.tail(clip(tail, 0, len(df)))
-    return jsonify(status='ok', state=df.to_dict(orient='list'))
+    return jsonify(state=df.to_dict(orient='list'))
+
+
+async def put_manual(req):
+    global auto
+    body = await req.json()
+    state = body['steering_state']
+    if state == 'RM': auto = False
+    if state == 'ID': auto = True
+    return Response(status=200)
+
+
+async def put_state(req):
+    if auto:
+        return Response(status=403)
+
+    body = await req.json()
+    state = body['state']
+    type = req.match_info['type']
+    id = req.match_info['id']
+
+    if type == 'pump':
+        id = 'P'+id
+        if id not in PUMPS:
+            return Response(status=400)
+        set_pump(id, state)
+
+    if type == 'valve':
+        id = 'Y'+id
+        if id not in VALVES:
+            return Response(status=400)
+        set_valve(id, state)
+
+    return Response(status=200)
 
 
 def make_app(args):
     app = web.Application()
-    app.router.add_get('/status', get_status)
-    app.router.add_get('/config', get_config)
-    app.router.add_get('/history', get_history)
+    app.router.add_get(r'/status', get_status)
+    app.router.add_get(r'/config', get_config)
+    app.router.add_get(r'/history', get_history)
+    app.router.add_put(r'/manual', put_manual)
+    app.router.add_put(r'/manual/{type:(pump|valve)}/{id}', put_state)
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     return app
 
 
 if __name__ == "__main__":
-    web.run_app(make_app())
+    web.run_app(make_app([]))
