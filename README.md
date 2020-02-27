@@ -19,7 +19,8 @@ $ python3 main.py
 
 ## API
 
-Aktualne pomiary:
+### Aktualne pomiary
+
 - timestamp: czas uniksowy w sekundach (float!)
 - Ci: poziom zbiornika
 - Yi: status zaworu (1: otwarty)
@@ -37,7 +38,29 @@ GET /status -> {
 }
 ```
 
-Aktualna konfiguracja:
+### Historia pomiarów
+
+- last: ile ostatnich pomiarów wysłać (opcjonalne)
+- timestamp[j]: czas uniksowy w sekundach (float!)
+- Ci[j]: poziom zbiornika
+- Yi[j]: status zaworu (1: otwarty)
+- Pi[j]: status pompy (1: włączona)
+
+```
+GET /history?last=int -> {
+    "status": "ok",
+    "state": {
+        "timestamp": [1582809916.5852017, ...],
+        "C1": [33, 33, ...],
+        "C2": [20, 20, ...],
+        ...
+        "P4": [0, 0, 1, ...]
+    }
+}
+```
+
+### Aktualna konfiguracja
+
 - C_min: minimalna pojemność zbiornika przy której może być włączona pompa
 - C_max: maksymalna pojemność zbiornika przy której może być otwarty zawór
 - C_cap: pojemność danego zbiornika
@@ -53,7 +76,8 @@ GET /config -> {
 }
 ```
 
-Informacja o błędnym zapytaniu:
+### Informacja o błędnym zapytaniu
+
 - status: ok/error
 - message: wiadomość dla programisty
 

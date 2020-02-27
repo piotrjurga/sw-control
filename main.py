@@ -14,6 +14,8 @@ from aiohttp import web
 
 from config import *
 from embedded import *
+#def switchState(x,y): pass
+#def readData(x): return 0
 
 # state keys
 KEYS = ["timestamp"] + METERS + VALVES + PUMPS
@@ -28,6 +30,15 @@ min_meter_delta = 0.5 * measure_delay
 
 # current cycle
 cycle = None
+
+def clip(x, mini, maxi):
+    return max(min(x, maxi), mini)
+
+def to_int(s):
+    try:
+        return int(s)
+    except:
+        return None
 
 def jsonify(**kwargs):
     return web.json_response(kwargs)
@@ -272,8 +283,6 @@ async def on_startup(app):
 
 
 async def on_cleanup(app):
-    #app['cycle'].cancel()
-    #await app['cycle']
     pass
 
 
@@ -286,10 +295,20 @@ async def get_config(req):
     return jsonify(status='ok', C_min=C_min, C_max=C_max, C_cap=C_cap, T_ust=T_ust)
 
 
+async def get_history(req):
+    params = req.rel_url.query
+    df = cycle.history
+    tail = to_int(params.get('last', None))
+    if tail is not None:
+        df = df.tail(clip(tail, 0, len(df)))
+    return jsonify(status='ok', state=df.to_dict(orient='list'))
+
+
 def make_app(args):
     app = web.Application()
     app.router.add_get('/status', get_status)
     app.router.add_get('/config', get_config)
+    app.router.add_get('/history', get_history)
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
     return app
