@@ -1,2 +1,3 @@
 aiohttp
 pandas
+python-box
