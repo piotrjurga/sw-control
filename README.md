@@ -13,9 +13,9 @@ Następnie można włączyć serwer:
 ```bash
 $ make serve
 # albo
-$ python3 -m aiohttp.web -H 0.0.0.0 -P 8080 main:make_app
+$ python3 app.py
 # albo
-$ python3 main.py
+$ python3 -m aiohttp.web -H 0.0.0.0 -P 8080 app:make_app
 ```
 
 Serwer wysyła stan na adres `DB_URL`, do ustawienia w `config.py`.
