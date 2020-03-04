@@ -1,4 +1,4 @@
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 
 from time import time, sleep
 from statistics import median
@@ -69,8 +69,3 @@ def startup_gpio():
 def cleanup_gpio():
     GPIO.cleanup()
 
-
-def read_level(x): return 0
-def write_state(x, y): return
-def startup_gpio(): return
-def cleanup_gpio(): return
