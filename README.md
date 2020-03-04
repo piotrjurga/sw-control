@@ -30,7 +30,7 @@ $ curl -XGET localhost:8080/history?last=20
 $ curl -XPUT localhost:8080/state -d '{"Y1": 0, "P1": 1}'
 ```
 
-#### `GET /info`
+### GET `/info`
 Zwróć informacje o stacji (dostępne identyfikatory zbiorników, pomp, zaworów).
 
 ```
@@ -42,7 +42,7 @@ GET /info
 }
 ```
 
-#### `GET /history`
+### GET `/history`
 Zwróć ostatnie stany stacji. Następniki w liście są nowsze od poprzedników.
 
 **Parametry**
@@ -64,7 +64,7 @@ GET /history?last=5
 }
 ```
 
-#### `GET /state`
+### GET `/state`
 Zwróć aktualny stan stacji.
 
 **Body**
@@ -85,7 +85,7 @@ GET /state
 }
 ```
 
-#### `PUT /state`
+### PUT `/state`
 Ustaw tryb działania stacji, jeśli podano, a następnie stany zaworów i pomp.
 
 **Body**
@@ -99,7 +99,7 @@ PUT /state
 {"mode": "manual", "Y1": 1, "Y2": 1, "Y3": 1}
 ```
 
-#### `GET /config`
+### GET `/config`
 Zwróć aktualną konfigurację stacji.
 
 **Body**
@@ -119,7 +119,7 @@ GET /config
 }
 ```
 
-#### `PUT /config`
+### PUT `/config`
 Zmień aktualną konfigurację stacji.
 Klucze w body takie same jak w `GET /config`.
 Dowolne klucze mogą być pominięte.
